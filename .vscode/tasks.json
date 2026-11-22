@@ -1,0 +1,60 @@
+{
+  // Shell-only commands: environment, FlashAttention wheel, HF auth, Jupyter, monitoring.
+  // Ctrl+Shift+P -> "Tasks: Run Task". Everything Python-runnable is in launch.json.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "env: uv sync (locked, notebook extra + dev; keeps flash-attn)",
+      "type": "shell",
+      "command": "UV_PROJECT_ENVIRONMENT=.venv uv sync --locked --inexact --extra notebook --dev",
+      "detail": "--inexact keeps the flash-attn wheel, which is not in uv.lock; a plain sync removes it (docs/acceleration.md).",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "env: install FlashAttention 2 (prebuilt wheel, pinned by hash)",
+      "type": "shell",
+      "command": "mkdir -p tmp && echo 'flash-attn @ https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3+cu12torch2.8cxx11abiTRUE-cp312-cp312-linux_x86_64.whl --hash=sha256:f25da18657a87fc83dc1bfb8b7751b82246e9db355510226b674fd437c34b5fb' > tmp/flash-attn.txt && uv pip install --python .venv --no-deps --require-hashes -r tmp/flash-attn.txt",
+      "detail": "Needed by --accel and --attn-implementation flash_attention_2. torch 2.8 / cu12 / cp312 / cxx11abi TRUE.",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "env: versions (torch / cuda / transformers / flash-attn)",
+      "type": "shell",
+      "command": ".venv/bin/python -c \"import torch, transformers; print('torch', torch.__version__, '| cuda', torch.version.cuda, '| avail', torch.cuda.is_available()); print('transformers', transformers.__version__)\" && .venv/bin/python -c \"import flash_attn; print('flash_attn', flash_attn.__version__)\"",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "hf: login",
+      "type": "shell",
+      "command": ".venv/bin/hf auth login",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "notebook: jupyter lab notebooks/inference.ipynb",
+      "type": "shell",
+      "command": "CUDA_VISIBLE_DEVICES=0 .venv/bin/jupyter lab notebooks/inference.ipynb",
+      "detail": "Set MODEL_ID to the local .work/Alpamayo2-Edge directory in cell 2 to avoid a second 5.3 GB download.",
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "tests: pytest (no debugger)",
+      "type": "shell",
+      "command": "CUDA_VISIBLE_DEVICES=0 ALPAMAYO2_EDGE_CHECKPOINT=$PWD/.work/Alpamayo2-Edge .venv/bin/python -m pytest -q",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "monitor: nvidia-smi every 1 s",
+      "type": "shell",
+      "command": "watch -n 1 nvidia-smi",
+      "isBackground": true,
+      "problemMatcher": []
+    }
+  ]
+}

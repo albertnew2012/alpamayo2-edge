@@ -1,0 +1,842 @@
+{
+  // Alpamayo 2 Edge: every runnable command, debuggable. F5 -> pick one.
+  //
+  // Interpreter: ${workspaceFolder}/.venv/bin/python (uv, Python 3.12, torch 2.8 / cu128).
+  // justMyCode:true everywhere (steps stay in project code); stopOnEntry:true so every launch
+  // pauses on its first line. Press F5 again to run on, or set breakpoints first.
+  // GPU: CUDA_VISIBLE_DEVICES=0 (cuda:1 drives the desktop). Weights: .work/Alpamayo2-Edge.
+  // Shell-only commands (uv sync, flash-attn wheel, hf login, jupyter lab) are in tasks.json.
+  // Study order and what each config teaches: study/00_START_HERE.md.
+  "version": "0.2.0",
+  "configurations": [
+    // ─────────────────────────── 0. SETUP ───────────────────────────
+    {
+      "name": "0a. Env check (versions, GPUs, FA2, checkpoint, HF access)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/00_env_check.py",
+      "presentation": { "group": "0-setup", "order": 1 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false",
+        "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "100000"
+      }
+    },
+    {
+      // README "Download the model for local use": pinned revision, 5.32 GB into .work/.
+      "name": "0b. Download weights -> .work/Alpamayo2-Edge (pinned revision)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/download_weights.py",
+      "presentation": { "group": "0-setup", "order": 2 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge"
+      }
+    },
+    {
+      // README "Tests" with the checkpoint: 158 tests, including the CUDA-graph ones (needs FA2).
+      "name": "0c. Tests: pytest with checkpoint",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["-q"],
+      "presentation": { "group": "0-setup", "order": 3 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "ALPAMAYO2_EDGE_CHECKPOINT": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false"
+      }
+    },
+    {
+      "name": "0d. Tests: one file (the open test file)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["-q", "${file}"],
+      "presentation": { "group": "0-setup", "order": 4 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "ALPAMAYO2_EDGE_CHECKPOINT": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false"
+      }
+    },
+
+    // ─────────────────────────── 1. README DEMOS (the CLI) ───────────────────────────
+    {
+      // README "Sampling settings": the navigation example on the local checkpoint.
+      // -> outputs/local-model/<clip>_<t0>/{output.json, output.safetensors, packed.safetensors, prompt.txt}
+      "name": "1a. CLI: navigation example, local weights (1 CoT, 1 trajectory)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "alpamayo2_edge.inference",
+      "args": [
+        "--model-id", "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "--manifest", "examples/nav_samples.json",
+        "--output", "outputs/local-model"
+      ],
+      "presentation": { "group": "1-readme-cli", "order": 1 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "TOKENIZERS_PARALLELISM": "false",
+        "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "100000"
+      }
+    },
+    {
+      // README "Sampling settings": six independent CoTs, each with its own trajectory.
+      "name": "1b. CLI: six candidates (--num-traj-samples 6)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "alpamayo2_edge.inference",
+      "args": [
+        "--model-id", "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "--manifest", "examples/nav_samples.json",
+        "--num-traj-sets", "1", "--num-traj-samples", "6",
+        "--output", "outputs/six-independent-trajectories"
+      ],
+      "presentation": { "group": "1-readme-cli", "order": 2 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "TOKENIZERS_PARALLELISM": "false",
+        "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "100000"
+      }
+    },
+    {
+      // README "Accelerated inference": torch.compile + CUDA graphs (first call compiles ~70 s).
+      "name": "1c. CLI: accelerated (--accel tuned, FA2)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "alpamayo2_edge.inference",
+      "args": [
+        "--model-id", "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "--manifest", "examples/nav_samples.json",
+        "--accel", "tuned",
+        "--output", "outputs/accelerated"
+      ],
+      "presentation": { "group": "1-readme-cli", "order": 3 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "TOKENIZERS_PARALLELISM": "false",
+        "TORCHINDUCTOR_CACHE_DIR": "${workspaceFolder}/tmp/inductor_cache",
+        "TRITON_CACHE_DIR": "${workspaceFolder}/tmp/triton_cache"
+      }
+    },
+    {
+      // README "For a local checkpoint and an explicitly selected clip". Edit the clip/nav here.
+      "name": "1d. CLI: explicit clip / t0 / nav text",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "alpamayo2_edge.inference",
+      "args": [
+        "--model-id", "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "--clip-id", "ea7bbd31-b7a5-4972-8dbd-7089e6b53de4",
+        "--t0-us", "4000000",
+        "--nav-text", "Turn left in 30m",
+        "--output", "outputs/explicit-clip"
+      ],
+      "presentation": { "group": "1-readme-cli", "order": 4 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "TOKENIZERS_PARALLELISM": "false"
+      }
+    },
+    {
+      // Same as 1a with the FlashAttention-2 backend for the VLM and the expert.
+      "name": "1e. CLI: FlashAttention-2 backend (--attn-implementation flash_attention_2)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "alpamayo2_edge.inference",
+      "args": [
+        "--model-id", "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "--manifest", "examples/nav_samples.json",
+        "--attn-implementation", "flash_attention_2",
+        "--output", "outputs/fa2"
+      ],
+      "presentation": { "group": "1-readme-cli", "order": 5 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "TOKENIZERS_PARALLELISM": "false"
+      }
+    },
+    {
+      // README's very first command: HF repo id + immutable revision. NOTE: downloads another
+      // 5.3 GB copy into ~/.cache/huggingface (the local configs above avoid that).
+      "name": "1f. CLI: from the Hub (nvidia/Alpamayo2-Edge @ pinned revision)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "alpamayo2_edge.inference",
+      "args": [
+        "--model-id", "nvidia/Alpamayo2-Edge",
+        "--revision", "f8951d095de3589b3face1dec3f4394c8ecedb38",
+        "--manifest", "examples/nav_samples.json",
+        "--output", "outputs/physicalai-nav"
+      ],
+      "presentation": { "group": "1-readme-cli", "order": 6 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "TOKENIZERS_PARALLELISM": "false"
+      }
+    },
+    {
+      "name": "1g. CLI: --help",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "alpamayo2_edge.inference",
+      "args": ["--help"],
+      "presentation": { "group": "1-readme-cli", "order": 7 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": { "PYTHONPATH": "${workspaceFolder}/src" }
+    },
+
+    // ─────────────────────────── 2. NOTEBOOK ───────────────────────────
+    {
+      // notebooks/inference.ipynb executed headless on the local weights (upstream file untouched):
+      // 22-frame grid, six CoTs + BEV, accelerated rerun, freeform VQA.
+      // -> study/outputs/inference_executed.ipynb + notebook_fig*.png
+      // For interactive Jupyter use the task "notebook: jupyter lab".
+      "name": "2a. Notebook: execute inference.ipynb headless (local weights)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/run_notebook.py",
+      "presentation": { "group": "2-notebook", "order": 1 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false",
+        "TORCHINDUCTOR_CACHE_DIR": "${workspaceFolder}/tmp/inductor_cache",
+        "TRITON_CACHE_DIR": "${workspaceFolder}/tmp/triton_cache"
+      }
+    },
+
+    // ─────────────────────────── 3. STUDY SCRIPTS (in session order) ───────────────────────────
+    {
+      // Session 1. The notebook demo as a script + where candidate diversity comes from.
+      "name": "3-1. Demo: 22 cameras, 6 candidates, BEV vs logged path, diversity split",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/06_demo_bev.py",
+      "presentation": { "group": "3-study", "order": 1 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      // Treat the Cosmos3-Edge backbone in transformers as project code, so F11 on
+      // alpamayo2_edge.py:139 (self.vlm.model(...)) lands in Cosmos3EdgeModel.forward.
+      // The rest of transformers/torch is still skipped.
+      "rules": [{ "module": "transformers.models.cosmos3_edge", "include": true }],
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false",
+        "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "100000"
+      }
+    },
+    {
+      // Companion to 3-1: the same call (6 candidates, seed 43) with every stage's shapes,
+      // cache sizes, masks and timings recorded by wrapping the model's own methods.
+      // -> study/outputs/pipeline_trace.json; the doc is study/12_PIPELINE_3-1.md.
+      "name": "3-1b. Trace: pipeline 3-1 stage by stage (shapes, KV cache, masks, timings)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/19_pipeline_trace.py",
+      "presentation": { "group": "3-study", "order": 1 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "rules": [{ "module": "transformers.models.cosmos3_edge", "include": true }],
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false",
+        "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "100000"
+      }
+    },
+    {
+      // Session 2. Parameter tree, per-layer shapes, tokenizer layout, KV contract.
+      "name": "3-2. Anatomy: where the 2.65 B parameters live",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/01_anatomy.py",
+      "presentation": { "group": "3-study", "order": 2 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false",
+        "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "100000"
+      }
+    },
+    {
+      // Session 3. 22 images + 20 poses + nav -> 3,261 tokens; history bins; M-RoPE positions.
+      "name": "3-3. Prompt & tokens: the 3,261-token sequence",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/02_prompt_and_tokens.py",
+      "presentation": { "group": "3-study", "order": 3 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false",
+        "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "100000"
+      }
+    },
+    {
+      // Session 3b. Dataset -> frames/poses -> chat prompt -> resized patches, every stage checked.
+      // Write-up: study/10_DATA_WORKFLOW.md
+      "name": "3-3b. Data workflow: clip id -> model inputs, stage by stage",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/15_data_workflow.py",
+      "presentation": { "group": "3-study", "order": 3 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false",
+        "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "100000"
+      }
+    },
+    {
+      // Session 4. THE central one: nine explicit stages, each checked bit-exact vs the library.
+      // Good breakpoints: the decode loop ([7]) and the Euler loop ([8]).
+      "name": "3-4. Walkthrough: one call unrolled, bit-exact vs library",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/04_walkthrough.py",
+      "presentation": { "group": "3-study", "order": 4 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false",
+        "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "100000"
+      }
+    },
+    {
+      // Session 5a. Course vs yaw heading, (accel, curvature), discrete tokens, bf16 constants. No GPU.
+      "name": "3-5a. Action space: course heading, unicycle, round trips",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/03_action_space.py",
+      "presentation": { "group": "3-study", "order": 5 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "100000"
+      }
+    },
+    {
+      // Session 5b. Decoded x_t along the 10 Euler steps; 1..50-step sweep.
+      "name": "3-5b. Flow matching: noise -> plan, step-count sweep",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/05_flow_matching.py",
+      "presentation": { "group": "3-study", "order": 6 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false",
+        "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "100000"
+      }
+    },
+    {
+      // Session 5c. Hand-written reasoning forced into the cache, images/route/noise fixed:
+      // does the trajectory follow the text? (stop: yes; turn left / go straight: no)
+      // Write-up: study/09_REASONING_ACTION_STUDY.md
+      "name": "3-5c. CoT intervention: does the trajectory follow the reasoning?",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/13_cot_intervention.py",
+      "presentation": { "group": "3-study", "order": 6 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false",
+        "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "100000"
+      }
+    },
+    {
+      // Session 5c follow-up: reasoning phrased like a route ('Turn left in 20m.') against
+      // three routes, one of which names no direction ('Continue straight').
+      // Write-up: study/09_REASONING_ACTION_STUDY.md
+      "name": "3-5d. CoT intervention grid: route-style reasoning x 3 routes",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/13_cot_intervention.py",
+      "args": ["--grid-only", "--tag", "route_style",
+               "--grid-routes", "Turn right in 30m", "Turn left in 30m", "Continue straight",
+               "--grid-cots", "Turn right in 20m.", "Turn left in 20m.", "stop"],
+      "presentation": { "group": "3-study", "order": 6 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false",
+        "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "100000"
+      }
+    },
+    {
+      // Speed words in the forced reasoning: only 'stop' moves the plan.
+      // Write-up: study/09_REASONING_ACTION_STUDY.md
+      "name": "3-5e. CoT intervention: speed words (slow down / speed up / stop) x 3 routes",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/13_cot_intervention.py",
+      "args": ["--grid-only", "--tag", "slow_down",
+               "--grid-routes", "Turn right in 30m", "Turn left in 30m", "Continue straight",
+               "--grid-cots", "<NOMINAL>", "Slow down.", "Slow down significantly.", "Speed up.", "stop"],
+      "presentation": { "group": "3-study", "order": 6 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false",
+        "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "100000"
+      }
+    },
+    {
+      // Which part of the stop sentence matters: the command or the reason?
+      // Write-up: study/09_REASONING_ACTION_STUDY.md
+      "name": "3-5f. CoT intervention: stop command vs hazard vs yield",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/13_cot_intervention.py",
+      "args": ["--grid-only", "--tag", "stop_split", "--grid-routes", "Turn right in 30m",
+               "--grid-cots", "<NOMINAL>", "Stop.", "Stop at the intersection and wait.",
+               "Crossing traffic has not cleared our path.",
+               "Yield to the crossing vehicle from the right before turning right to follow our route.",
+               "stop"],
+      "presentation": { "group": "3-study", "order": 6 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false",
+        "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "100000"
+      }
+    },
+    {
+      // Attention mass of the 64 action tokens by input segment (eager attention, 28 layers x 10 steps).
+      // Method, results and breakpoints: study/08_EXPERT_ATTENTION.md
+      "name": "3-5g. Expert attention: where the flow-matching expert looks",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/14_expert_attention.py",
+      "presentation": { "group": "3-study", "order": 6 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false",
+        "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "100000"
+      }
+    },
+    {
+      // How much does the reasoning help? 21 clips x (own CoT | forced <NOMINAL> | forced empty),
+      // matched noise seeds. Needs study/outputs/eval_oracle_k6.json from 3-7a.
+      // Method, results and breakpoints: study/09_REASONING_ACTION_STUDY.md section 7
+      "name": "3-5h. Reasoning ablation: own CoT vs <NOMINAL> vs empty (21 clips)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/16_reasoning_ablation.py",
+      "presentation": { "group": "3-study", "order": 6 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false",
+        "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "100000"
+      }
+    },
+    {
+      // Session 6a. Same scene, four route sentences.
+      "name": "3-6a. Navigation ablation: right / left / straight / stop",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/07_nav_ablation.py",
+      "presentation": { "group": "3-study", "order": 7 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false"
+      }
+    },
+    {
+      // Session 6b. The same weights as a VLM: 24 frames + a question, greedy.
+      "name": "3-6b. VQA: freeform questions about the scene",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/08_vqa.py",
+      "presentation": { "group": "3-study", "order": 8 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false"
+      }
+    },
+    {
+      // Session 7. 21 clips (incl. the Alpamayo 1.5 test clip), oracle route text, ADE/minADE.
+      // Streams 6 camera videos per clip on first run (~1 min/clip), cached in tmp/sample_cache.
+      "name": "3-7a. Eval: 21 clips, oracle route, 6 candidates",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/10_eval_multiclip.py",
+      "args": ["--n-clips", "20", "--candidates", "6", "--nav-mode", "oracle"],
+      "presentation": { "group": "3-study", "order": 9 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false"
+      }
+    },
+    {
+      // Session 7, control: same clips, every route replaced by one fixed sentence.
+      "name": "3-7b. Eval: same clips, fixed route text (what the route is worth)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/10_eval_multiclip.py",
+      "args": ["--n-clips", "20", "--candidates", "6", "--nav-mode", "fixed",
+               "--fixed-nav", "Continue straight"],
+      "presentation": { "group": "3-study", "order": 10 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false"
+      }
+    },
+    {
+      // Session 7, head-to-head: paired comparison with Alpamayo 1.5 on the same 21 clips.
+      // Needs 3-7a, 3-7b here and config "29." in ~/Desktop/alpamayo1.5 (its own venv) first.
+      "name": "3-7c. Compare: Edge vs Alpamayo 1.5, same clips (paired)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/11_compare_with_a15.py",
+      "presentation": { "group": "3-study", "order": 10 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": { "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts" }
+    },
+    {
+      // Session 8. Eager vs --accel tuned vs FA2; stage split; peak memory.
+      "name": "3-8. Latency & VRAM: eager vs accel vs FA2",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/09_latency_vram.py",
+      "presentation": { "group": "3-study", "order": 11 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false",
+        "TORCHINDUCTOR_CACHE_DIR": "${workspaceFolder}/tmp/inductor_cache",
+        "TRITON_CACHE_DIR": "${workspaceFolder}/tmp/triton_cache"
+      }
+    },
+    {
+      // Regenerates study/diagrams/alpamayo2_edge_architecture.svg from study/outputs/anatomy.json.
+      "name": "3-9. Diagram: regenerate the architecture SVG",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/make_architecture_svg.py",
+      "presentation": { "group": "3-study", "order": 12 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": { "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts" }
+    },
+    {
+      // RL in miniature, CPU only (~10 s): a 3-weight planner trained by imitation, then by
+      // sample -> score -> push toward the better-than-average plans. study/11_RL_EXPLAINED.md
+      "name": "3-10. RL in miniature: imitation vs reward training (CPU)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/17_rl_toy.py",
+      "presentation": { "group": "3-study", "order": 13 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": ""
+      }
+    },
+    {
+      // The math behind the RL update: how -advantage * log p(plan) moves each plan's probability.
+      // CPU, instant. study/11_RL_EXPLAINED.md section 6
+      "name": "3-10b. RL math: advantage x log p, one plan / one group / any model (CPU)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/18_advantage_math.py",
+      "presentation": { "group": "3-study", "order": 14 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": ""
+      }
+    },
+
+    // ─────────────────────────── 4. DEMO VIDEOS (study/outputs/videos/) ───────────────────────────
+    {
+      // One inference per 0.1 s over the whole clip (180 ticks, ~6 min): 6 cameras with the
+      // projected plans, BEV, live reasoning. Edit --clip-id for another clip.
+      "name": "4a. Video: drive-along, README clip (6 cameras + BEV + reasoning)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/12_demo_videos.py",
+      "args": ["drive", "--clip-id", "ea7bbd31-b7a5-4972-8dbd-7089e6b53de4"],
+      "presentation": { "group": "4-videos", "order": 1 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false",
+        "TORCHINDUCTOR_CACHE_DIR": "${workspaceFolder}/tmp/inductor_cache",
+        "TRITON_CACHE_DIR": "${workspaceFolder}/tmp/triton_cache"
+      }
+    },
+    {
+      // Oracle route vs the same sentence with left/right swapped, side by side.
+      "name": "4b. Video: route steering split-screen, README clip",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/12_demo_videos.py",
+      "args": ["route", "--clip-id", "ea7bbd31-b7a5-4972-8dbd-7089e6b53de4",
+               "--t-start", "2.0", "--t-end", "11.0"],
+      "presentation": { "group": "4-videos", "order": 2 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false",
+        "TORCHINDUCTOR_CACHE_DIR": "${workspaceFolder}/tmp/inductor_cache",
+        "TRITON_CACHE_DIR": "${workspaceFolder}/tmp/triton_cache"
+      }
+    },
+    {
+      // One tick, six candidates: the 10 Euler steps animated from noise to the plans.
+      "name": "4c. Video: flow matching, noise -> plan",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/study/scripts/12_demo_videos.py",
+      "args": ["flow"],
+      "presentation": { "group": "4-videos", "order": 3 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false"
+      }
+    },
+
+    // ─────────────────────────── 9. GENERIC ───────────────────────────
+    {
+      "name": "9. Python: current file",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "presentation": { "group": "9-generic", "order": 1 },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/study/scripts",
+        "CUDA_VISIBLE_DEVICES": "0",
+        "EDGE_MODEL": "${workspaceFolder}/.work/Alpamayo2-Edge",
+        "TOKENIZERS_PARALLELISM": "false"
+      }
+    }
+  ]
+}
